@@ -63,12 +63,12 @@ async function run() {
         // Search by facility name using $regex (Assignment Challenge)
         //if (search) {
         //  query.name = { $regex: search, $options: 'i' };
-       //}
+        //}
 
         // Filter by sport type using $in (Assignment Challenge)
         //if (type && type !== 'All') {
         //  query.facility_type = { $in: [type] };
-       // }
+        // }
 
         const db = client.db("game-project");
         const facilitiesCollection = db.collection("facilities");
@@ -81,7 +81,78 @@ async function run() {
       }
     });
     // ==================== END GET /facilities ====================
+   // ==================== GET: Single Facility by ID ====================
+app.get('/facilities/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { ObjectId } = require('mongodb');
+    
+    const db = client.db("game-project");
+    const facilitiesCollection = db.collection("facilities");
+    
+    const facility = await facilitiesCollection.findOne({ 
+      _id: new ObjectId(id) 
+    });
 
+    if (!facility) {
+      return res.status(404).json({ message: "Facility not found" });
+    }
+
+    res.json(facility);
+  } catch (error) {
+    console.error('Error fetching facility:', error);
+    res.status(500).json({ message: 'Failed to fetch facility' });
+  }
+});
+// ==================== END GET /facilities/:id ====================
+
+// ==================== POST: Create Booking ====================
+app.post('/bookings', async (req, res) => {
+  try {
+    const booking = req.body;
+    
+    // Validate required fields
+    const requiredFields = [
+      'facility_id',
+      'facility_name',
+      'booking_date',
+      'time_slot',
+      'hours',
+      'total_price'
+    ];
+
+    for (const field of requiredFields) {
+      if (!booking[field]) {
+        return res.status(400).json({ message: `${field} is required` });
+      }
+    }
+
+    // Set default values
+    booking.status = 'pending';
+    booking.created_at = new Date();
+
+    const db = client.db("game-project");
+    const bookingsCollection = db.collection("bookings");
+    
+    const result = await bookingsCollection.insertOne(booking);
+
+    // Update facility booking count
+    const { ObjectId } = require('mongodb');
+    await facilitiesCollection.updateOne(
+      { _id: new ObjectId(booking.facility_id) },
+      { $inc: { booking_count: 1 } }
+    );
+
+    res.status(201).json({
+      message: 'Booking created successfully',
+      insertedId: result.insertedId
+    });
+  } catch (error) {
+    console.error('Error creating booking:', error);
+    res.status(500).json({ message: 'Failed to create booking' });
+  }
+});
+// ==================== END POST /bookings ====================
   } finally {
     // await client.close();
   }
